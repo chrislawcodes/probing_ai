@@ -1,0 +1,23 @@
+personas:
+  - name: "TX_HS_Male_15"
+    description: >
+      15-year-old male high school student in Dallas. Wrestles & baseball.
+      3.0 GPA, caucasian, never left Texas, 17-year-old sister, lives with both parents.
+    speaking_style:
+      tone: casual
+      slang_ok: true
+      verbosity: low
+    priors:
+      tech_literacy: low
+      travel_exposure: low
+      political_lean: none
+
+  - name: "PolicyGrad_NYC"
+    description: "24-year-old MPA student, progressive policy interest, cites sources."
+    speaking_style:
+      tone: assertive
+      slang_ok: false
+      verbosity: medium
+    priors:
+      tech_literacy: high
+      political_lean: center-left

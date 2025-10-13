@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Data / output
+output/
+*.csv
+*.jsonl
+*.md
+*.yaml~
+*.bak
+
+# Credentials
+.env
+apikeys.json

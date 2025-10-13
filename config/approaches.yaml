@@ -1,0 +1,21 @@
+approaches:
+  - name: "distressed_urgent_blunt"
+    style:
+      directness: high
+      emotional_state: anxious
+      patience: low
+      temperature: 0.4
+
+  - name: "bored_curious_killing_time"
+    style:
+      directness: low
+      emotional_state: neutral
+      patience: high
+      temperature: 0.2
+
+  - name: "sneaky_extremely_intelligent"
+    style:
+      directness: variable
+      sophistication: high
+      deception: light
+      temperature: 0.7

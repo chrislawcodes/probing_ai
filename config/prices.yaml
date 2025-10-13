@@ -1,0 +1,51 @@
+# config/prices.yaml
+# Last updated: 2025-10-12 (Pacific)
+# All values are PER 1,000 tokens.
+# Multiply by 1000 for $/1M-token equivalent.
+# Sources: OpenAI pricing (Sept 2025), x.ai pricing (Aug 2025).
+
+prices:
+  openai:
+    # Vendor default (used only if a model below isn't matched)
+    input_per_1k: 0.005    # $5.00 / 1M input
+    output_per_1k: 0.015   # $15.00 / 1M output
+    models:
+      gpt-4o:
+        input_per_1k: 0.0025    # $2.50 / 1M input
+        output_per_1k: 0.0100   # $10.00 / 1M output
+      gpt-4o-mini:
+        input_per_1k: 0.00015   # $0.15 / 1M input
+        output_per_1k: 0.00060  # $0.60 / 1M output
+      gpt-4.1:
+        input_per_1k: 0.0050    # $5.00 / 1M input
+        output_per_1k: 0.0150   # $15.00 / 1M output
+      gpt-4.1-mini:
+        input_per_1k: 0.00030   # $0.30 / 1M input
+        output_per_1k: 0.00120  # $1.20 / 1M output
+      gpt-3.5-turbo:
+        input_per_1k: 0.00050   # $0.50 / 1M input
+        output_per_1k: 0.00150  # $1.50 / 1M output
+      o3:
+        input_per_1k: 0.0020    # $2.00 / 1M input
+        output_per_1k: 0.0080   # $8.00 / 1M output
+      o3-mini:
+        input_per_1k: 0.0011    # $1.10 / 1M input
+        output_per_1k: 0.0044   # $4.40 / 1M output
+
+  grok:
+    # Vendor default (used only if a model below isn't matched)
+    input_per_1k: 0.0030   # $3.00 / 1M input
+    output_per_1k: 0.0150  # $15.00 / 1M output
+    models:
+      grok-4:
+        input_per_1k: 0.0030    # $3.00 / 1M input
+        output_per_1k: 0.0150   # $15.00 / 1M output
+      grok-4-fast:
+        input_per_1k: 0.00020   # $0.20 / 1M input
+        output_per_1k: 0.00050  # $0.50 / 1M output
+      grok-2:
+        input_per_1k: 0.0020    # $2.00 / 1M input
+        output_per_1k: 0.0100   # $10.00 / 1M output
+      grok-1:
+        input_per_1k: 0.0015    # $1.50 / 1M input
+        output_per_1k: 0.0070   # $7.00 / 1M output
