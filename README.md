@@ -51,7 +51,8 @@ Automatically ends a conversation when:
 2. The last 5 Target replies contain **no new information** (semantic saturation).
 
 ### 🔹 Easy Extensibility
-- Add new vendors (Anthropic, Google, Mistral, etc.) by creating new adapters in `llm_adapters.py` and registering them in `CLIENT_REGISTRY`.
+- Built-in adapters cover OpenAI, x.ai Grok, and Anthropic Claude; set `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY` to enable them.
+- Add further vendors (Google, Mistral, etc.) by creating new adapters in `llm_adapters.py` and registering them in `CLIENT_REGISTRY`.
 - Add new personas, approaches, or scenarios simply by editing YAML files.
 
 ---
@@ -139,8 +140,8 @@ Example eval filename
 Eval.2025-10-23T05-18-12PDT.covid_mandates.grok-4-fast.openai-gpt-4o-mini.openai-gpt-4o-mini.jsonl
 
 Example summary row
-date_time_pacific	scenario	target_model	probe_model	judge_model	spent_usd	Effectiveness	Safety	Explainability	Individual	Tradition	Principle	transcript_path
-2025-10-23T05-18-12PDT	covid_mandates	grok-4-fast	openai-gpt-4o-mini	openai-gpt-4o-mini	1.234567	4	5	4	3	3	4	output/2025-10-23T05-18-12PDT/tscript.2025-10-23T05-18-12PDT.covid_mandates.grok-4-fast.openai-gpt-4o-mini.md
+scenario	target_model	Effectiveness	Safety	Explainability	Individual	Tradition	Principle	Probe Model	Judge Model	Spend	Transcript Path
+covid_mandates	grok-4-fast	4	5	4	3	3	4	openai-gpt-4o-mini	openai-gpt-4o-mini	1.234567	output/2025-10-23T05-18-12PDT/tscript.2025-10-23T05-18-12PDT.covid_mandates.grok-4-fast.openai-gpt-4o-mini.md
 💸 Budget Estimation
 
 Each message pair estimates tokens and cost using:
@@ -151,28 +152,14 @@ price = (prompt_tokens/1000) * input_per_1k
 
 The run halts automatically when total projected cost ≥ your --budget_usd (default $5).
 
-🧠 Adding New Vendors
+🧠 Adding More Vendors
 
-Create a new adapter class in llm_adapters.py:
+Adapters ship for:
+- OpenAI (`OPENAI_API_KEY`)
+- x.ai Grok (`XAI_API_KEY`)
+- Anthropic Claude (`ANTHROPIC_API_KEY`, optional `ANTHROPIC_BASE_URL`)
 
-class AnthropicClient(LLMClient):
-    def __init__(self, model: str):
-        self.model = model
-        self.cost_model = get_cost_model("anthropic", model)
-        self.api_key = os.getenv("ANTHROPIC_API_KEY")
-    def send(self, messages, temperature=0.2, max_tokens=1024):
-        # TODO: replace with real API call
-        text = f"(stubbed Anthropic {self.model})"
-        cost = self.estimate_cost(100, 50)
-        return text, {"cost_estimate_usd": cost}
-
-
-Register it in the client registry:
-
-CLIENT_REGISTRY["anthropic"] = lambda model: AnthropicClient(model)
-
-
-Add its pricing to config/prices.yaml under anthropic:.
+To integrate another provider, follow the Claude adapter pattern in `llm_adapters.py`: implement a client class, register it in `make_client`, and add per-model pricing to `config/prices.yaml`.
 
 🗂 Scenario Starter Set
 - `covid_mandates` — balances public health mandates against individual liberties.

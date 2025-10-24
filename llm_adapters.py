@@ -370,6 +370,129 @@ class GrokClient(LLMClient):
 
 
 # =====================================================================
+# Anthropic Claude Client
+# =====================================================================
+
+ANTHROPIC_MODELS: Dict[str, str] = {
+    "claude-3-5-sonnet": "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku": "claude-3-5-haiku-latest",
+    "claude-3-opus": "claude-3-opus-20240229",
+    "claude-3-sonnet": "claude-3-sonnet-20240229",
+    "claude-3-haiku": "claude-3-haiku-20240307",
+}
+
+
+def _anthropic_convert_messages(messages: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Convert OpenAI-style messages to Anthropic's Messages API format.
+    Returns (system_prompt, message_list).
+    """
+    system_parts: List[str] = []
+    out_msgs: List[Dict[str, Any]] = []
+
+    for msg in messages or []:
+        role = (msg.get("role") or "").lower()
+        content = msg.get("content") or ""
+        if not isinstance(content, str):
+            content = str(content)
+        if role == "system":
+            system_parts.append(content)
+            continue
+        if role not in ("user", "assistant"):
+            role = "user"
+        out_msgs.append(
+            {
+                "role": role,
+                "content": [{"type": "text", "text": content}],
+            }
+        )
+
+    system_prompt = "\n\n".join(part.strip() for part in system_parts if part and part.strip())
+    return system_prompt, out_msgs
+
+
+class ClaudeClient(LLMClient):
+    def __init__(
+        self,
+        model: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        pricebook: Optional[Pricebook] = None,
+    ):
+        self.vendor = "anthropic"
+        self.model = ANTHROPIC_MODELS.get(model, model)
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        self.base_url = base_url or os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
+        self.version = os.getenv("ANTHROPIC_VERSION") or "2023-06-01"
+        self.pricebook = pricebook or Pricebook.load()
+        self.cost_model = self.pricebook.find(self.vendor, self.model)
+        self.price_source = f"pricebook:{self.vendor}:{self.model}"
+
+    def send(
+        self,
+        *,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.5,
+        max_tokens: int = 512,
+        **kwargs: Any
+    ) -> Tuple[str, Dict[str, Any]]:
+        if not self.api_key:
+            return "(stubbed Claude) Missing ANTHROPIC_API_KEY.", {"cost_estimate_usd": 0.0}
+
+        system_prompt, anthropic_messages = _anthropic_convert_messages(messages)
+        if not anthropic_messages:
+            anthropic_messages = [{
+                "role": "user",
+                "content": [{"type": "text", "text": "Hello"}],
+            }]
+
+        url = f"{self.base_url.rstrip('/')}/v1/messages"
+        headers = {
+            "x-api-key": self.api_key,
+            "anthropic-version": self.version,
+            "content-type": "application/json",
+        }
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": anthropic_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+
+        try:
+            data = self._post(url, headers, payload)
+            content = data.get("content") or []
+            text_fragments = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_fragments.append(item.get("text") or "")
+            text = "".join(text_fragments)
+            usage = data.get("usage") or {}
+            p_tok = int(usage.get("input_tokens") or 0)
+            c_tok = int(usage.get("output_tokens") or 0)
+            usage_out = {
+                "prompt_tokens": p_tok,
+                "completion_tokens": c_tok,
+                "cost_estimate_usd": round(self.estimate_cost(p_tok, c_tok), 6),
+                "price_source": getattr(self, "price_source", "unknown"),
+            }
+            return text, usage_out
+        except requests.HTTPError as e:
+            body = ""
+            try:
+                body = e.response.text[:600] if e.response is not None else ""
+            except Exception:
+                pass
+            print(f"ANTHROPIC HTTP ERROR: {e.response.status_code if e.response else None} :: {e} :: {body}")
+            return f"(stubbed Claude) HTTP {getattr(e.response,'status_code',None)}", {"cost_estimate_usd": 0.0}
+        except Exception as e:
+            print("ANTHROPIC CLIENT ERROR:", repr(e))
+            return f"(stubbed Claude) Error: {e}", {"cost_estimate_usd": 0.0}
+
+
+# =====================================================================
 # Factory
 # =====================================================================
 
@@ -385,8 +508,10 @@ def make_client(vendor: str, model: str) -> LLMClient:
         return OpenAIClient(m, pricebook=pricebook)
     if v in ("grok", "xai", "x.ai", "x_ai"):
         return GrokClient(m, pricebook=pricebook)
+    if v in ("anthropic", "claude"):
+        return ClaudeClient(m, pricebook=pricebook)
 
-    raise ValueError(f"Unknown vendor '{vendor}'. Supported: openai, grok")
+    raise ValueError(f"Unknown vendor '{vendor}'. Supported: openai, grok, anthropic")
 
 
 # =====================================================================
@@ -397,6 +522,7 @@ __all__ = [
     "LLMClient",
     "OpenAIClient",
     "GrokClient",
+    "ClaudeClient",
     "make_client",
     "rough_chat_token_count",
     "Pricebook",

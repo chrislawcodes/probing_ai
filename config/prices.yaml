@@ -49,3 +49,23 @@ prices:
       grok-1:
         input_per_1k: 0.0015    # $1.50 / 1M input
         output_per_1k: 0.0070   # $7.00 / 1M output
+
+  anthropic:
+    input_per_1k: 0.0030    # $3.00 / 1M input (fallback)
+    output_per_1k: 0.0150   # $15.00 / 1M output (fallback)
+    models:
+      claude-3-5-sonnet-latest:
+        input_per_1k: 0.00375   # $3.75 / 1M input
+        output_per_1k: 0.0150   # $15.00 / 1M output
+      claude-3-5-haiku-latest:
+        input_per_1k: 0.00080   # $0.80 / 1M input
+        output_per_1k: 0.0032   # $3.20 / 1M output
+      claude-3-opus-20240229:
+        input_per_1k: 0.0150    # $15.00 / 1M input
+        output_per_1k: 0.0750   # $75.00 / 1M output
+      claude-3-sonnet-20240229:
+        input_per_1k: 0.0030    # $3.00 / 1M input
+        output_per_1k: 0.0150   # $15.00 / 1M output
+      claude-3-haiku-20240307:
+        input_per_1k: 0.00025   # $0.25 / 1M input
+        output_per_1k: 0.00125  # $1.25 / 1M output

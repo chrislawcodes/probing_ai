@@ -38,7 +38,7 @@ Each conversation runs as a structured multi-turn dialogue between Probe and Tar
 
 probing_ai  
 - main.py — orchestrates Probe–Target–Judge runs, logging, and budgets  
-- llm_adapters.py — unified API clients for OpenAI and Grok x.ai, pricing, and cost calculation  
+- llm_adapters.py — unified API clients for OpenAI, x.ai Grok, and Anthropic Claude, pricing, and cost calculation  
 - config  
   - scenarios.yaml — defines scenario topics, goals, start prompts, and follow-ups  
   - eval_framework.yaml — defines the evaluation rubric  
@@ -125,6 +125,7 @@ Pass `--scenarios all` (default) to run every scenario, an integer to sample ran
 - Error handling ensures partial transcripts are written even on interruption.  
 - Anti-looping logic detects repeated answers and halts if there is no new content.  
 - Real-time output can be streamed by running with PYTHONUNBUFFERED set to one.
+- API keys: set `OPENAI_API_KEY`, `XAI_API_KEY`, and/or `ANTHROPIC_API_KEY`. Optionally override vendor base URLs via `OPENAI_BASE_URL`, `XAI_BASE_URL`, or `ANTHROPIC_BASE_URL`.
 
 ---
 
@@ -172,5 +173,5 @@ Talk to it like a human, then measure what it reveals.
 
 ## Version History
 
-Version 0.2, October 2025 — refreshed evaluation framework (Effectiveness/Safety focus), new policy scenarios, summary CSV + judge explanations.  
+Version 0.2, October 2025 — refreshed evaluation framework (Effectiveness/Safety focus), new policy scenarios, summary CSV + judge explanations, native Claude adapter.  
 Version 0.1, October 2025 — initial release with full orchestration, pricing, and testing framework.
