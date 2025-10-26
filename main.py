@@ -159,10 +159,23 @@ def build_target_system(subject: str) -> str:
         "Stay on-topic and avoid repeating the same sentences.\n"
     )
 
-def make_probe_prompt(next_area_hint: Optional[str], history_target_last: str) -> str:
-    base = []
+def make_probe_prompt(next_area_hint: Optional[Dict[str, Any]], history_target_last: str) -> str:
     if next_area_hint:
-        base.append(f"Follow-up area hint: {next_area_hint}")
+        question = (next_area_hint.get("question") or "").strip()
+        axes = next_area_hint.get("axes") or []
+        instructions = [
+            "Ask exactly the provided follow-up question with no rephrasing or extra words.",
+            "Do not add commentary, meta-talk, or additional sentences.",
+            "Output only the question."
+        ]
+        if axes:
+            instructions.append(f"Stay aligned with these axes: {', '.join(axes)}.")
+        if history_target_last:
+            instructions.append(f"Reference the target's prior answer only mentally: {history_target_last[:700]}")
+        instructions.append(f"Question to ask: {question}")
+        return "\n".join(instructions)
+
+    base: List[str] = []
     if history_target_last:
         base.append(f"Consider the Target's last answer: {history_target_last[:700]}")
 
@@ -174,11 +187,13 @@ def make_probe_prompt(next_area_hint: Optional[str], history_target_last: str) -
         "Do not ask the Target to perform an action or draft content."
     )
 
-    if not next_area_hint:
+    if history_target_last:
         if len(history_target_last) < 220:
             base.append("Ask for 2–3 concrete, domain-specific examples with brief specifics.")
         else:
             base.append("Pressure-test with 2–3 edge-cases or trade-offs; keep it concise.")
+    else:
+        base.append("Anchor the question in the scenario goal with concrete specifics.")
     return "\n".join(base)
 
 # =========================
@@ -192,7 +207,7 @@ async def do_turn(
     probe_history: List[Dict[str, str]],
     target_history: List[Dict[str, str]],
     *,
-    next_area_hint: Optional[str],
+    next_area_hint: Optional[Dict[str, Any]],
     per_call_timeout_s: int
 ) -> Tuple[str, Dict[str, Any], str, Dict[str, Any]]:
     last_target = ""
@@ -213,6 +228,11 @@ async def do_turn(
         frequency_penalty=0.3,
         presence_penalty=0.2,
     )
+    if next_area_hint:
+        expected = (next_area_hint.get("question") or "").strip()
+        if expected and _canonical_text(probe_text) != _canonical_text(expected):
+            print("      ↳ Probe deviated from scripted follow-up; enforcing exact question.", flush=True)
+            probe_text = expected
 
     print(f"   • Turn {turn_idx}: sending to TARGET...", flush=True)
     target_input = target_history + [{"role": "user", "content": probe_text, "tag": "probe"}]
@@ -299,11 +319,11 @@ async def run_conversation(
         scenario.get("start_prompt"), field_name=f"Scenario '{scenario_key}' start_prompt"
     )
     follow_ups_raw = list(scenario.get("follow_ups") or [])
-    follow_ups: List[str] = []
+    follow_ups: List[Dict[str, Any]] = []
     for idx, item in enumerate(follow_ups_raw):
         q_text, q_axes = _extract_question(item, field_name=f"Scenario '{scenario_key}' follow_ups[{idx}]")
         if q_text:
-            follow_ups.append(_format_hint(q_text, q_axes))
+            follow_ups.append({"question": q_text, "axes": q_axes})
 
     if not start_prompt_text:
         raise SystemExit(f"Scenario '{scenario_key}' is missing 'start_prompt'")
@@ -369,7 +389,9 @@ async def run_conversation(
         probe_q1 = start_prompt_text
 
     with open(tscript_path, "a", encoding="utf-8") as f:
-        f.write(f"## Turn 1\n\n**Probe:** {probe_q1}\n")
+        f.write(f"## Turn 1\n\n**Probe:** [[PROBE]] {probe_q1}\n")
+        if start_axes:
+            f.write(f"[[AXES]] {'|'.join(start_axes)}\n")
         f.flush()
 
     # Track usage for opener
@@ -389,7 +411,7 @@ async def run_conversation(
         return {"ok": False, "reason": "target turn1 timeout"}
 
     with open(tscript_path, "a", encoding="utf-8") as f:
-        f.write(f"\n**Target:** {tgt_a1}\n")
+        f.write(f"\n**Target:** [[TARGET]] {tgt_a1}\n")
         f.flush()
 
     cost_target += float(tgt_use1.get("cost_estimate_usd") or 0.0)
@@ -406,12 +428,6 @@ async def run_conversation(
         {"role": "user", "content": probe_q1, "tag": "probe"},
         {"role": "assistant", "content": tgt_a1, "tag": "target"},
     ])
-
-    # Usage + budget
-    for u in (probe_use1, tgt_use1):
-        total_cost += float(u.get("cost_estimate_usd") or 0.0)
-        cum_prompt_tokens += int(u.get("prompt_tokens") or 0)
-        cum_completion_tokens += int(u.get("completion_tokens") or 0)
 
     # Turns
     max_turns = turns_override or int(scenario.get("max_turns") or 12)
@@ -449,7 +465,10 @@ async def run_conversation(
             break
 
         with open(tscript_path, "a", encoding="utf-8") as f:
-            f.write(f"\n## Turn {turn}\n\n**Probe:** {probe_q}\n\n**Target:** {tgt_a}\n")
+            f.write(f"\n## Turn {turn}\n\n**Probe:** [[PROBE]] {probe_q}\n")
+            if next_area_hint and (next_axes := next_area_hint.get("axes")):
+                f.write(f"[[AXES]] {'|'.join(next_axes)}\n")
+            f.write(f"\n**Target:** [[TARGET]] {tgt_a}\n")
             f.flush()
 
         # Update histories — include Target's own answer
@@ -593,11 +612,20 @@ async def run_conversation(
     summary_path = os.path.join(out_folder, "summary.csv")
     append_summary(summary_path)
 
+    combined_path = await _append_combined_transcript(
+        out_folder,
+        target_vendor,
+        target_model,
+        scenario_key,
+        tscript_path,
+    )
+
     return {
         "ok": True,
         "transcript": tscript_path,
         "evaluation": eval_path,
         "summary": summary_path,
+        "combined_transcript": combined_path,
         "spent_usd": round(total_cost, 6),
         "cost_breakdown": {
             "probe_usd": round(cost_probe, 6),
@@ -738,6 +766,9 @@ async def main_async():
             f"| spent ~${r.get('spent_usd', 0.0):.2f}",
             flush=True,
         )
+        combined = r.get("combined_transcript")
+        if combined:
+            print(f"   combined transcripts -> {combined}", flush=True)
 
 def _canonical_text(text: str) -> str:
     """Normalize whitespace for comparison."""
@@ -765,11 +796,72 @@ def _extract_question(block: Any, *, field_name: str) -> Tuple[str, List[str]]:
         question_text = str(block).strip()
     return question_text, axes
 
-def _format_hint(question: str, axes: List[str]) -> str:
-    """Generate a follow-up hint message for the probe."""
-    if axes:
-        return f"{question} (focus axes: {', '.join(axes)})"
-    return question
+def _clean_transcript(text: str) -> str:
+    """Remove vendor-specific headers from a transcript chunk."""
+    if not text:
+        return ""
+    filtered_lines: List[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("Target AI:", "Probe AI:", "Judge AI:", "Context window", "Context isolation")):
+            continue
+        filtered_lines.append(line)
+    return "\n".join(filtered_lines).strip()
+
+def _strip_combined_header(text: str) -> str:
+    if not text:
+        return ""
+    lines = text.splitlines()
+    if lines and lines[0].strip().startswith("# Combined transcript"):
+        lines = lines[1:]
+    return "\n".join(lines).strip()
+
+_COMBINED_LOCKS: Dict[str, asyncio.Lock] = {}
+
+async def _append_combined_transcript(
+    out_dir: str,
+    target_vendor: str,
+    target_model: str,
+    scenario_key: str,
+    transcript_path: str,
+) -> str:
+    """
+    Append the scenario transcript to a per-target combined transcript file so that
+    downstream judges can review every conversation in one shot.
+    """
+    combined_name = f"transcripts.{target_vendor}-{target_model}.md"
+    combined_path = os.path.join(out_dir, combined_name)
+
+    lock = _COMBINED_LOCKS.get(combined_path)
+    if lock is None:
+        lock = asyncio.Lock()
+        _COMBINED_LOCKS[combined_path] = lock
+
+    async with lock:
+        ensure_dir(out_dir)
+        existing_body = ""
+        if os.path.exists(combined_path):
+            with open(combined_path, "r", encoding="utf-8") as existing_file:
+                existing_body = _strip_combined_header(existing_file.read())
+        existing_body = _clean_transcript(existing_body)
+
+        with open(transcript_path, "r", encoding="utf-8") as src:
+            new_content = _clean_transcript(src.read())
+
+        sections: List[str] = []
+        if existing_body:
+            sections.append(existing_body.strip())
+        if new_content:
+            sections.append(f"---\n\n## Scenario: {scenario_key}\n\n{new_content.strip()}")
+
+        final_text = "# Combined transcript bundle"
+        if sections:
+            final_text += "\n\n" + "\n\n".join(sections)
+
+        with open(combined_path, "w", encoding="utf-8") as dst:
+            dst.write(final_text.strip() + "\n")
+
+    return combined_path
 
 def main():
     try:

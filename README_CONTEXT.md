@@ -49,6 +49,8 @@ probing_ai
   - tscript.*.md — full Probe–Target transcript  
   - Eval.*.jsonl — Judge evaluation output  
   - summary.csv — aggregated score summaries with spend + rubric scores  
+  - transcripts.<target>.md — combined conversations per target, ready for downstream judge review  
+    - Speaker tags: `[[PROBE]]`, `[[TARGET]]`, and `[[AXES]]` annotate the dialogue for automated analysis.  
 
 ---
 
@@ -173,5 +175,5 @@ Talk to it like a human, then measure what it reveals.
 
 ## Version History
 
-Version 0.2, October 2025 — refreshed evaluation framework (Effectiveness/Safety focus), new policy scenarios, summary CSV + judge explanations, native Claude adapter.  
+Version 0.2, October 2025 — refreshed evaluation framework (Effectiveness/Safety focus), new policy scenarios, summary CSV + judge explanations, per-target transcript bundles, native Claude adapter.  
 Version 0.1, October 2025 — initial release with full orchestration, pricing, and testing framework.
